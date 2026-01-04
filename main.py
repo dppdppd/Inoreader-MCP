@@ -2,6 +2,7 @@
 """
 Minimal MCP server for Inoreader - Based on working examples
 """
+
 import asyncio
 import json
 import sys
@@ -9,32 +10,41 @@ import logging
 from typing import Dict, Any
 from config import Config
 from tools import (
-    list_feeds_tool, list_articles_tool, search_articles_tool,
-    get_content_tool, mark_as_read_tool, summarize_article_tool,
-    analyze_articles_tool, get_stats_tool
+    list_feeds_tool,
+    list_articles_tool,
+    search_articles_tool,
+    get_content_tool,
+    mark_as_read_tool,
+    summarize_article_tool,
+    analyze_articles_tool,
+    get_stats_tool,
+    add_feed_tool,
+    edit_feed_tool,
+    unsubscribe_feed_tool,
 )
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, stream=sys.stderr)
 logger = logging.getLogger(__name__)
 
+
 class MinimalMCPServer:
     def __init__(self):
         pass
-        
+
     async def send_response(self, response: Dict[str, Any]):
         """Send JSON response to stdout"""
         json_str = json.dumps(response)
         print(json_str, flush=True)
-        
+
     async def handle_message(self, message: Dict[str, Any]):
         """Handle incoming message"""
         method = message.get("method", "")
         params = message.get("params", {})
         msg_id = message.get("id", 0)
-        
+
         logger.info(f"Received method: {method}")
-        
+
         try:
             if method == "initialize":
                 await self.handle_initialize(msg_id, params)
@@ -44,11 +54,11 @@ class MinimalMCPServer:
                 await self.handle_call_tool(msg_id, params)
             else:
                 await self.send_error(msg_id, -32601, f"Unknown method: {method}")
-                
+
         except Exception as e:
             logger.error(f"Error handling {method}: {e}", exc_info=True)
             await self.send_error(msg_id, -32603, str(e))
-            
+
     async def handle_initialize(self, msg_id: Any, params: Dict):
         """Handle initialize"""
         response = {
@@ -56,28 +66,19 @@ class MinimalMCPServer:
             "id": msg_id,
             "result": {
                 "protocolVersion": "2024-11-05",
-                "capabilities": {
-                    "tools": {}
-                },
-                "serverInfo": {
-                    "name": "inoreader-mcp",
-                    "version": "1.0.0"
-                }
-            }
+                "capabilities": {"tools": {}},
+                "serverInfo": {"name": "inoreader-mcp", "version": "1.0.0"},
+            },
         }
         await self.send_response(response)
-        
+
     async def handle_list_tools(self, msg_id: Any):
         """List available tools"""
         tools = [
             {
                 "name": "inoreader_list_feeds",
                 "description": "List all subscribed feeds in Inoreader",
-                "inputSchema": {
-                    "type": "object",
-                    "properties": {},
-                    "required": []
-                }
+                "inputSchema": {"type": "object", "properties": {}, "required": []},
             },
             {
                 "name": "inoreader_list_articles",
@@ -86,24 +87,24 @@ class MinimalMCPServer:
                     "type": "object",
                     "properties": {
                         "limit": {
-                            "type": "integer", 
-                            "description": "Number of articles to return (default: 20)"
+                            "type": "integer",
+                            "description": "Number of articles to return (default: 20)",
                         },
                         "days": {
                             "type": "integer",
-                            "description": "Articles from last N days (default: 7)"
+                            "description": "Articles from last N days (default: 7)",
                         },
                         "feed_id": {
                             "type": "string",
-                            "description": "Optional feed ID to filter articles"
+                            "description": "Optional feed ID to filter articles",
                         },
                         "unread_only": {
                             "type": "boolean",
-                            "description": "Only show unread articles (default: true)"
-                        }
+                            "description": "Only show unread articles (default: true)",
+                        },
                     },
-                    "required": []
-                }
+                    "required": [],
+                },
             },
             {
                 "name": "inoreader_search",
@@ -111,21 +112,18 @@ class MinimalMCPServer:
                 "inputSchema": {
                     "type": "object",
                     "properties": {
-                        "query": {
-                            "type": "string",
-                            "description": "Search query"
-                        },
+                        "query": {"type": "string", "description": "Search query"},
                         "days": {
                             "type": "integer",
-                            "description": "Search within the last N days (default: 7)"
+                            "description": "Search within the last N days (default: 7)",
                         },
                         "limit": {
                             "type": "integer",
-                            "description": "Number of articles to return (default: 50)"
-                        }
+                            "description": "Number of articles to return (default: 50)",
+                        },
                     },
-                    "required": ["query"]
-                }
+                    "required": ["query"],
+                },
             },
             {
                 "name": "inoreader_get_content",
@@ -135,11 +133,11 @@ class MinimalMCPServer:
                     "properties": {
                         "article_id": {
                             "type": "string",
-                            "description": "Article ID to get content for"
+                            "description": "Article ID to get content for",
                         }
                     },
-                    "required": ["article_id"]
-                }
+                    "required": ["article_id"],
+                },
             },
             {
                 "name": "inoreader_mark_as_read",
@@ -150,73 +148,83 @@ class MinimalMCPServer:
                         "article_ids": {
                             "type": "array",
                             "items": {"type": "string"},
-                            "description": "List of article IDs to mark as read"
+                            "description": "List of article IDs to mark as read",
                         }
                     },
-                    "required": ["article_ids"]
-                }
-            },
-            {
-                "name": "inoreader_summarize",
-                "description": "Generate a summary of an article",
-                "inputSchema": {
-                    "type": "object",
-                    "properties": {
-                        "article_id": {
-                            "type": "string",
-                            "description": "Article ID to summarize"
-                        }
-                    },
-                    "required": ["article_id"]
-                }
-            },
-            {
-                "name": "inoreader_analyze",
-                "description": "Analyze multiple articles for trends, sentiment, or keywords",
-                "inputSchema": {
-                    "type": "object",
-                    "properties": {
-                        "article_ids": {
-                            "type": "array",
-                            "items": {"type": "string"},
-                            "description": "List of article IDs to analyze"
-                        },
-                        "analysis_type": {
-                            "type": "string",
-                            "enum": ["summary", "trends", "sentiment", "keywords"],
-                            "description": "Type of analysis to perform"
-                        }
-                    },
-                    "required": ["article_ids", "analysis_type"]
-                }
+                    "required": ["article_ids"],
+                },
             },
             {
                 "name": "inoreader_stats",
                 "description": "Get statistics about unread articles",
+                "inputSchema": {"type": "object", "properties": {}, "required": []},
+            },
+            {
+                "name": "inoreader_add_feed",
+                "description": "Subscribe to new feed",
                 "inputSchema": {
                     "type": "object",
-                    "properties": {},
-                    "required": []
-                }
-            }
+                    "properties": {
+                        "feed_url": {
+                            "type": "string",
+                            "description": "URL of the feed to subscribe to",
+                        }
+                    },
+                    "required": ["feed_url"],
+                },
+            },
+            {
+                "name": "inoreader_edit_feed",
+                "description": "Edit feed",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "stream_id": {
+                            "type": "string",
+                            "description": "Stream ID of the feed to edit",
+                        },
+                        "new_title": {
+                            "type": "string",
+                            "description": "New title for the feed",
+                        },
+                        "add_to_folder": {
+                            "type": "string",
+                            "description": "Folder to add feed to",
+                        },
+                        "remove_from_folder": {
+                            "type": "string",
+                            "description": "Folder to remove feed from",
+                        },
+                    },
+                    "required": ["stream_id"],
+                },
+            },
+            {
+                "name": "inoreader_unsubscribe_feed",
+                "description": "Unsubscribe from feed",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "stream_id": {
+                            "type": "string",
+                            "description": "Stream ID of the feed to unsubscribe from",
+                        }
+                    },
+                    "required": ["stream_id"],
+                },
+            },
         ]
-        
-        response = {
-            "jsonrpc": "2.0",
-            "id": msg_id,
-            "result": {
-                "tools": tools
-            }
-        }
+
+        response = {"jsonrpc": "2.0", "id": msg_id, "result": {"tools": tools}}
         await self.send_response(response)
-        
+
     async def handle_call_tool(self, msg_id: Any, params: Dict):
         """Handle tool call"""
         tool_name = params.get("name", "")
         arguments = params.get("arguments", {})
-        
+
         logger.info(f"Calling tool: {tool_name}")
-        
+
         try:
             if tool_name == "inoreader_list_feeds":
                 result = await list_feeds_tool()
@@ -226,10 +234,7 @@ class MinimalMCPServer:
                 feed_id = arguments.get("feed_id")
                 unread_only = arguments.get("unread_only", True)
                 result = await list_articles_tool(
-                    feed_id=feed_id, 
-                    limit=limit, 
-                    unread_only=unread_only, 
-                    days=days
+                    feed_id=feed_id, limit=limit, unread_only=unread_only, days=days
                 )
             elif tool_name == "inoreader_search":
                 query = arguments.get("query", "")
@@ -251,86 +256,88 @@ class MinimalMCPServer:
                 result = await analyze_articles_tool(article_ids, analysis_type)
             elif tool_name == "inoreader_stats":
                 result = await get_stats_tool()
+            elif tool_name == "inoreader_add_feed":
+                feed_url = arguments.get("feed_url", "")
+                result = await add_feed_tool(feed_url)
+            elif tool_name == "inoreader_edit_feed":
+                stream_id = arguments.get("stream_id", "")
+                new_title = arguments.get("new_title")
+                add_to_folder = arguments.get("add_to_folder")
+                remove_from_folder = arguments.get("remove_from_folder")
+                result = await edit_feed_tool(
+                    stream_id=stream_id,
+                    new_title=new_title,
+                    add_to_folder=add_to_folder,
+                    remove_from_folder=remove_from_folder,
+                )
+            elif tool_name == "inoreader_unsubscribe_feed":
+                stream_id = arguments.get("stream_id", "")
+                result = await unsubscribe_feed_tool(stream_id)
             else:
                 raise ValueError(f"Unknown tool: {tool_name}")
-                
+
             response = {
-                "jsonrpc": "2.0", 
+                "jsonrpc": "2.0",
                 "id": msg_id,
-                "result": {
-                    "content": [
-                        {
-                            "type": "text",
-                            "text": result
-                        }
-                    ]
-                }
+                "result": {"content": [{"type": "text", "text": result}]},
             }
-            
+
         except Exception as e:
             logger.error(f"Tool error: {e}")
             response = {
                 "jsonrpc": "2.0",
-                "id": msg_id, 
+                "id": msg_id,
                 "result": {
-                    "content": [
-                        {
-                            "type": "text",
-                            "text": f"Error: {str(e)}"
-                        }
-                    ],
-                    "isError": True
-                }
+                    "content": [{"type": "text", "text": f"Error: {str(e)}"}],
+                    "isError": True,
+                },
             }
-            
+
         await self.send_response(response)
-        
+
     async def send_error(self, msg_id: Any, code: int, message: str):
         """Send error response"""
         response = {
             "jsonrpc": "2.0",
             "id": msg_id,
-            "error": {
-                "code": code,
-                "message": message
-            }
+            "error": {"code": code, "message": message},
         }
         await self.send_response(response)
-        
+
     async def run(self):
         """Main server loop"""
         logger.info("Starting minimal MCP server...")
-        
+
         # Read from stdin
         reader = asyncio.StreamReader()
         protocol = asyncio.StreamReaderProtocol(reader)
-        
-        await asyncio.get_event_loop().connect_read_pipe(
-            lambda: protocol, sys.stdin
-        )
-        
+
+        await asyncio.get_event_loop().connect_read_pipe(lambda: protocol, sys.stdin)
+
         while True:
             try:
                 line = await reader.readline()
                 if not line:
                     break
-                    
+
                 line_str = line.decode().strip()
                 if not line_str:
                     continue
-                    
+
                 try:
                     message = json.loads(line_str)
                     await self.handle_message(message)
                 except json.JSONDecodeError:
                     logger.error(f"Invalid JSON: {line_str}")
-                    
+
             except Exception as e:
                 logger.error(f"Server loop error: {e}")
-                
+
+
 async def main():
     server = MinimalMCPServer()
     await server.run()
-    
+
+
 if __name__ == "__main__":
     asyncio.run(main())
