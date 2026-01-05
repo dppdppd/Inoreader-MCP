@@ -525,7 +525,7 @@ async def unsubscribe_feed_tool(stream_id: str) -> str:
     try:
         async with InoreaderClient() as client:
             result = await client.edit_subscription(
-                stream_id=stream_id, action="unsubscribe"
+                stream_id=stream_id, action="unfollow"
             )
 
             if result == "OK":
